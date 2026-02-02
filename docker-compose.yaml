@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # -----------------------------------------------------------------
+  # DATABASE: PostgreSQL
+  # Хранит настройки пользователей, шаблоны, логи (основное хранилище)
+  # -----------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: diploma_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user # FIXME
+      POSTGRES_PASSWORD: password # FIXME
+      POSTGRES_DB: notification_db # FIXME
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - diploma_net
+
+  # -----------------------------------------------------------------
+  # CACHE & QUEUE: Redis
+  # Используется для Asynq (задачи), Rate Limiting и кеширования конфигов
+  # -----------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: diploma_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - diploma_net
+
+  # UI для просмотра задач Asynq (http://localhost:8081)
+  # asynqmon:
+  #   image: hibiken/asynqmon
+  #   container_name: diploma_asynqmon
+  #   ports:
+  #     - "8081:8080"
+  #   command: ["--redis-addr", "redis:6379"]
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - diploma_net
+
+  # -----------------------------------------------------------------
+  # MESSAGE BROKER: Kafka + Zookeeper
+  # "Нервная система" для обмена сообщениями между сервисами
+  # -----------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: diploma_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - diploma_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: diploma_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092" # Порт для хоста (твоего Go кода локально)
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Важная настройка для работы и внутри Docker, и снаружи:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - diploma_net
+
+  # UI для Kafka (http://localhost:8080)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: diploma_kafka_ui
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - diploma_net
+
+# -----------------------------------------------------------------
+# VOLUMES & NETWORKS
+# -----------------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  diploma_net:
+    driver: bridge
