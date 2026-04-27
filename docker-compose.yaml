@@ -95,6 +95,62 @@ services:
     depends_on:
       - postgres
       - kafka
+      - redis
+    networks:
+      - diploma_net
+
+  # -----------------------------------------------------------------
+  # API GATEWAY: HTTP entry point
+  # -----------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ../api-gateway
+      dockerfile: Dockerfile
+    container_name: diploma_api_gateway
+    restart: always
+    command: ["-c", "configs/config.docker.yaml"]
+    ports:
+      - "8081:8081"
+    depends_on:
+      - kafka
+      - persistence-service
+    networks:
+      - diploma_net
+
+  # -----------------------------------------------------------------
+  # ORCHESTRATOR: business logic, Kafka consumer
+  # -----------------------------------------------------------------
+  orchestrator:
+    build:
+      context: ../orchestrator
+      dockerfile: Dockerfile
+    container_name: diploma_orchestrator
+    restart: always
+    command: ["-c", "configs/config.docker.yaml"]
+    ports:
+      - "8082:8081"
+    depends_on:
+      - kafka
+      - persistence-service
+    networks:
+      - diploma_net
+
+  # -----------------------------------------------------------------
+  # TELEGRAM ADAPTER: delivery channel
+  # -----------------------------------------------------------------
+  telegram-adapter:
+    build:
+      context: ../telegram-adapter
+      dockerfile: Dockerfile
+    container_name: diploma_telegram_adapter
+    restart: always
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    volumes:
+      - ../telegram-adapter/configs/config.docker.yaml:/configs/config.yaml:ro
+    depends_on:
+      - kafka
+      - redis
     networks:
       - diploma_net
 
