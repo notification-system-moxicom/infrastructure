@@ -154,6 +154,28 @@ services:
     networks:
       - diploma_net
 
+  # -----------------------------------------------------------------
+  # EMAIL ADAPTER: delivery channel
+  # -----------------------------------------------------------------
+  email-adapter:
+    build:
+      context: ../email-adapter
+      dockerfile: Dockerfile
+    container_name: diploma_email_adapter
+    restart: always
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+    volumes:
+      - ../email-adapter/configs/config.docker.yaml:/configs/config.yaml:ro
+    depends_on:
+      - kafka
+      - redis
+    networks:
+      - diploma_net
+
   # UI для Kafka (http://localhost:8080)
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
