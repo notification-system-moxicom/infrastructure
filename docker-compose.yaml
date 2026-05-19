@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3'
 
 services:
   # -----------------------------------------------------------------
@@ -164,15 +164,29 @@ services:
     container_name: diploma_email_adapter
     restart: always
     environment:
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+      SMTP_HOST: mailpit
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      SMTP_FROM: "notifications@moxicom.local"
     volumes:
       - ../email-adapter/configs/config.docker.yaml:/configs/config.yaml:ro
     depends_on:
       - kafka
       - redis
+      - mailpit
+    networks:
+      - diploma_net
+
+  # -----------------------------------------------------------------
+  # MAILPIT: mock SMTP for local email testing (UI: http://localhost:8025)
+  # -----------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: diploma_mailpit
+    restart: always
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
     networks:
       - diploma_net
 
